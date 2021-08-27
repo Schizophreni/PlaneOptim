@@ -1,6 +1,8 @@
 """
 对飞行器飞行过程中油耗问题进行建模
 """
+import matplotlib.pyplot as plt
+
 
 class FuelTank:
     """
@@ -15,12 +17,12 @@ class FuelTank:
         self.max_speed = max_speed
         
         ### 邮箱质心
-        self.x = x
-        self.y = y
-        self.z = z
-    
+        self.x = center_x
+        self.y = center_y
+        self.z = center_z
+            
     def consume(self, t, consume_speed): ### 耗油
-        volume = self.volume - t*consume_spped 
+        volume = self.volume - t*consume_speed 
         assert volume >=0, 'not enough fuel to consume'
         self.volume = volume
     
@@ -48,7 +50,7 @@ class Plane:
         ft6 = FuelTank(2.4, 1.0, 0.5, 0.8, -2.086957, -1.49347826, 0.21669004, 1.1)
         self.fueltanks = [ft1, ft2, ft3, ft4, ft5, ft6]
     
-    def move(self, t, speeds, theta):
+    def move(self, t, speeds):
         """
         飞机移动，更新邮箱油量
         :param t: time_interval
@@ -90,6 +92,45 @@ class Plane:
             self.center_z = z_accu / total_mass
         else:
             pass ### 当飞机倾斜时，油面水平，需要进行计算
+    
+    def travel(self, fuel_curve, theta_curve, plot=False):
+        """
+        旅行函数，根据输入供油曲线和角度曲线，返回质心曲线
+        """
+        center_x_curve = []
+        center_y_curve = []
+        center_z_curve = [] ### 初始质心曲线
+        for i in range(fuel_curve.shape[0]):
+            t = 1 ### 1s采集一次
+            speeds = fuel_curve[i, 1:] ### 供油
+            theta = theta_curve[i, 1]
+            self.move(t, speeds)
+            self.compute_center(theta=0) ### theta=theta_curve[i, 1]
+            center_x_curve.append(self.center_x)
+            center_y_curve.append(self.center_y)
+            center_z_curve.append(self.center_z)
+        
+        if plot:
+            ### 描绘质心曲线
+            plt.figure(figsize=(8, 6))
+            ts = fuel_curve[:, 0]
+            plt.plot(ts, center_x_curve,  label='x center', linewidth=1.0)
+            plt.plot(ts, center_y_curve,  label='y center', linewidth=1.0)
+            plt.plot(ts, center_z_curve,  label='z center', linewidth=1.0)
+            plt.title('X, Y, Z Center Curve of Plane')
+            plt.legend()
+            # plt.show()
+            plt.savefig('results/Q1.png')
+        return center_x_curve, center_y_curve, center_z_curve
+
+
+if __name__ == '__main__':
+    from utils.parse_xlsx import *
+    fuel_curve, theta_curve = parse_Q1(file_path='data/data_Q1.xlsx')
+    plane = Plane(mass=3000, rho=850)
+    xs, ys, zs = plane.travel(fuel_curve, theta_curve, plot=True)
+    print(xs[:100])
+            
             
             
                 
