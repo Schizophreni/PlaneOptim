@@ -2,6 +2,7 @@
 对飞行器飞行过程中油耗问题进行建模
 """
 import matplotlib.pyplot as plt
+import numpy as np
 
 
 class FuelTank:
@@ -29,6 +30,61 @@ class FuelTank:
     def charge(self, t, consume_speed):  ### 加油
         volume = self.volume + t*consume_speed
         self.volume = volume
+    
+    def pose(self, theta=0):
+        """
+        邮箱姿态，根据角度和油量计算邮箱的质心
+        """
+        Vol = self.length*self.width*self.height ### 总容积
+        if theta == 0:
+            ### 单独考虑无角度
+            x_bias = self.x
+            y_bias = self.y
+            z_bias = self.z - 1/2*(self.height-self.volume/(self.length*self.width))
+            return x_bias, y_bias, z_bias
+        ### 倾斜情况
+        abs_theta = abs(theta) ### theta为正负时具有对称性，x坐标关于中心对称
+        
+        l1 = np.sqrt(2*self.volume/(self.width*np.tan(theta))) ### 三角形界面
+        l2 = np.sqrt(2*(Vol-self.volume)/(self.width*np.tan(theta))) ### 五边形截面
+        l3 = (self.volume-1/2*self.length**2*self.width*np.tan(theta))/(self.length*self.width) ### 四边形截面
+        l4 = (self.volume-1/2*self.height**2*self.width/np.tan(theta))/(self.width*self.height)
+        if l1<= self.length and l1*np.tan(theta) <= self.height:
+            ### 三角形截面
+            if theta > 0:
+                x_bias = self.x-1/2*self.length+1/3*l1
+            else:
+                x_bias = self.x + 1/2*self.length - 1/3*l1
+            y_bias = self.y
+            z_bias = self.z-1/2*self.height+1/3*l1*np.tan(theta)
+        elif l4 <= self.length and l4*np.tan(theta) <= self.height:
+            ### 五边形截面
+            if theta > 0:
+                x_bias = self.x-1/2*self.length+1/self.volume*(1/2*Vol*self.length-(Vol-self.volume)*(self.length-1/3*l2))
+            else:
+                x_bias = self.x+1/2*self.length-1/self.volume*(1/2*Vol*self.length-(Vol-self.volume)*(self.length-1/3*l2))
+            y_bias = self.y
+            z_bias = self.z-1/2*self.height+1/self.volume*(1/2*Vol*self.height-(Vol-self.volume)*(self.height-1/3*l2*np.tan(theta)))
+        elif l3 >= 0 and l3 < self.height:
+            ### 四边形截面并且没淹没油箱高
+            if theta>0:
+                x_bias = self.x - 1/2*self.length + 1/2*self.length - self.length**3*self.width*np.tan(theta)/(12*self.volume)
+            else:
+                x_bias = self.x + 1/2*self.length - 1/2*self.length + self.length**3*self.width*np.tan(theta)/(12*self.volume)
+            y_bias = self.y
+            z_bias = self.z - 1/2*self.height+ self.volume(2*self.length*self.width) + self.length**3*self.width*np.tan(theta)**2/(24*self.volume)
+        elif l4 >= 0 and l4 <= self.length:
+            ### 四边形截面并且淹没油箱长
+            if theta > 0:
+                x_bias = self.x - 1/2*self.length + self.volume(2*self.width*self.height) + self.width*self.height**3/(24*self.volume*np.tan(theta)**2)
+            else:
+                x_bias = self.x + 1/2*self.length - self.volume(2*self.width*self.height) - self.width*self.height**3/(24*self.volume*np.tan(theta)**2)
+            y_bias = self.y
+            z_bias = 1/2*self.height - self.width*self.height**3/(12*self.volume*np.tan(theta))
+        else:
+            raise Exception('No such case')
+            
+        return x_bias, y_bias, z_bias
 
 class Plane:
     def __init__(self, mass, rho):
@@ -52,7 +108,7 @@ class Plane:
     
     def move(self, t, speeds):
         """
-        飞机移动，更新邮箱油量
+        飞机移动，更新邮箱油量，同时更新
         :param t: time_interval
         :param speeds: 所有邮箱输油速度
         :param theta: 俯仰角度
@@ -82,10 +138,10 @@ class Plane:
         z_accu = 0 ### 累积z偏移
         if theta == 0:
             for fueltank in self.fueltanks:
-                x_accu += fueltank.volume*self.rho*fueltank.x
-                y_accu += fueltank.volume*self.rho*fueltank.y
-                fuel_center_z = fueltank.z - 1/2*(fueltank.height - fueltank.volume/(fueltank.length*fueltank.width)) ### 油的z坐标
-                z_accu += fueltank.volume*self.rho*fuel_center_z
+                x_bias, y_bias, z_bias = fueltank.pose(theta) ### 计算油箱坐标
+                x_accu += fueltank.volume*self.rho*x_bias
+                y_accu += fueltank.volume*self.rho*y_bias
+                z_accu += fueltank.volume*self.rho*z_bias
                 total_mass += fueltank.volume*self.rho
             self.center_x = x_accu / total_mass
             self.center_y = y_accu / total_mass
