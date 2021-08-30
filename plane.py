@@ -173,6 +173,8 @@ class Plane:
             plt.plot(ts, center_x_curve,  label='x center', linewidth=1.0)
             plt.plot(ts, center_y_curve,  label='y center', linewidth=1.0)
             plt.plot(ts, center_z_curve,  label='z center', linewidth=1.0)
+            plt.xlabel('Time (SECONDS)')
+            plt.ylabel('Distance (METERS)')
             plt.title('X, Y, Z Center Curve of Plane')
             plt.legend()
             # plt.show()
